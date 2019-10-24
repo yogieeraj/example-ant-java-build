@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: node-ant-jdk
+spec:
+  containers:
+    - name: node-ant-jdk
+      image: artifacts.microchip.com:7999/microchip/citd/bundles/node-ant-jdk:12.x-1.10.3-1.8.0_202
+      imagePullPolicy: Always
+      command: ['cat']
+      tty: true

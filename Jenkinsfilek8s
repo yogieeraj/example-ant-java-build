@@ -1,0 +1,61 @@
+pipeline {
+	agent {
+		kubernetes {
+			label 'example-ant-java-build'
+			defaultContainer 'node-ant-jdk'
+            yamlFile 'cloudprovider.yml'
+        }
+    }
+	
+    environment {
+        GIT_COMMIT_EMAIL = sh (script: 'git show -s --pretty=%ae',returnStdout: true).trim()
+    }
+
+    options {
+        timestamps()
+        timeout(time: 30, unit: 'MINUTES')
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+				execAnt("clean build")
+            }
+        }
+    }
+
+    post {
+		success{
+            mail to: "${env.GIT_COMMIT_EMAIL}, jayachandran.dharuman@microchip.com, Harish.Agari@microchip.com",
+                subject: "Successful Pipeline: ${currentBuild.fullDisplayName}",
+                body: "Something is right with ${env.BUILD_URL}"
+
+        }
+        failure {
+            mail    to: "${env.GIT_COMMIT_EMAIL}, jayachandran.dharuman@microchip.com, Harish.Agari@microchip.com",
+                    subject: "Failed Pipeline: ${currentBuild.fullDisplayName}",
+                    body: "Pipeline failure. ${env.BUILD_URL}"
+        }
+    }
+}
+
+def execAnt(String arguments) {
+	execute("ant " + arguments)
+}
+
+def execute(String command) {
+    if (isUnix()) {
+        sh command
+    } else {
+        bat command
+    }
+}
+
+

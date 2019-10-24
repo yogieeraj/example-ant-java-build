@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This ant script is used to build and run the MCU8 Peripheral Library -->
+<!-- By default, only the Clean and Build commands use this build script. -->
+<!-- Commands such as Run, Debug, and Test only use this build script if -->
+<!-- the Compile on Save feature is turned off for the project. -->
+<!-- You can turn off the Compile on Save (or Deploy on Save) setting -->
+<!-- in the project's Project Properties dialog box.-->
+<project name="ExampleLibrary_ANTProject" default="run" basedir="." xmlns:j2seproject1="http://www.netbeans.org/ns/j2se-project/1" xmlns:jacoco="antlib:org.jacoco.ant" xmlns:sonar="antlib:org.sonar.ant">
+    <property file="nbproject/project.properties"/>
+    <echo>Building using Ant ${ant.version} located at ${ant.home}</echo>
+    <echo>Ant binary is located at ${ant.home}</echo>
+    <!--echo>Java Classpath ${java.class.path}</echo-->
+    <echo>JDK Home = ${jdk.home}</echo>
+    <!-- This prints all properties, very useful for debugging !
+    <echoproperties/>  -->
+
+    <!--  SECTION : Public Build Targets   -->
+    <target name="clean" depends="build-run-directory">
+        <delete dir="${build.dir}"/>
+    </target>
+
+    <target name="build" depends="compile, jar, post-jar"/>
+    <target name="build-debug" depends="clean, compile-debug, jar, post-jar"/>
+
+    <target name="run" depends="build,jar,post-jar">
+        <java classname="${main-class}" dir="${mcc.rundir}" fork="true">
+            <arg value="${runArguments}"/>
+            <classpath>
+                <pathelement path="${run.classpath}"/>
+                <pathelement path="${mcc.rundir}/${standaloneJar}"/>
+            </classpath>
+            <jvmarg value="-ea"/>
+        </java>
+    </target>
+
+    <target depends="clean,build-debug" name="debug-nb">
+        <nbjpdastart addressproperty="jpda.address" name="${mcc.file.name}" transport="dt_socket">
+            <classpath>
+                <pathelement path="${run.classpath}"/>
+                <pathelement path="${mcc.rundir}/${standaloneJar}"/>
+            </classpath>
+        </nbjpdastart>
+        <java classname="${main-class}" dir="${mcc.rundir}" fork="true">
+            <arg value="${runArguments}"/>
+            <classpath>
+                <pathelement path="${run.classpath}"/>
+                <pathelement path="${mcc.rundir}/${standaloneJar}"/>
+            </classpath>
+            <jvmarg value="-ea"/>
+            <jvmarg value="-Xdebug"/>
+            <jvmarg value="-Xrunjdwp:transport=dt_socket,address=${jpda.address}"/>
+        </java>
+    </target>
+
+
+    <target name="jar" depends="compile">
+        <mkdir dir="${dist.dir}"/>
+        <jar manifest="${build.dir}/META-INF/MANIFEST.MF" destfile="${dist.jar}" basedir="${build.classes.dir}"/>
+    </target>
+
+    <target name="clean-build" depends="clean, build">
+    </target>
+
+ 
+    <target name="build-run-directory" description="Build the bin directory with project dependencies">
+        <!-- This produces an SDK 4.15-style run directory, but with some path changes -->
+        <mkdir dir="${mcc.rundir}" />
+        <get dest="./mcc-setup-3.85.1.xml" skipexisting="true" src="https://artifacts.microchip.com/artifactory/mcu8-bin/mcc-setup-3.85.1.xml" />
+        <ant antfile="./mcc-setup-3.85.1.xml" />
+    </target>
+
+    <!--  SECTION : Private Build Targets   -->
+    <!--  Various internal build targets exist in this section which are used by
+    the public interface which is called from the Netbeans IDE -->
+
+    <target name="init" description="Generate MANIFEST.MF file.">
+        <tstamp>
+            <format property="NOW" pattern="yyyy-MM-dd HH:mm:ss z" />
+        </tstamp>
+
+        <unjar src="${mcc.coredir}/core.jar" dest="./temp">
+            <patternset>
+                <include name="META-INF/MANIFEST.MF"/>
+            </patternset>
+        </unjar>
+        <loadproperties srcFile="temp/META-INF/MANIFEST.MF" prefix="coreManifest"/>
+
+        <loadfile property="library.name" srcFile="${src.dir}/META-INF/services/com.microchip.mcc.core.library.ILibrary">
+            <filterchain>
+                <striplinebreaks/>
+            </filterchain>
+        </loadfile>
+
+        <mkdir dir="${build.dir}/META-INF"/>
+        <manifest file="${build.dir}/META-INF/MANIFEST.MF">
+            <attribute name="MCC-Name" value="${mcc.display.name}"/>
+            <attribute name="MCC-Class" value="${library.name}"/>
+            <attribute name="MCC-Version" value="${mcc.version}" />
+            <attribute name="MCC-Revision" value="${svna.version}"/>
+            <attribute name="MCC-CoreVersion" value="${coreManifest.MCC-Version}"/>
+            <attribute name="MCC-Date" value="${NOW}" />
+            <attribute name="MCC-Category" value="${mcc.category}"/>
+            <attribute name="MCC-Vendor" value="${mcc.vendor}"/>
+        </manifest>
+
+        <presetdef name="javac">
+            <javac includeantruntime="false" />
+        </presetdef>
+
+        <presetdef name="jar" uri="http://www.netbeans.org/ns/j2se-project/1">
+            <jar compress="true" index="false" jarfile="${dist.jar}">
+                <j2seproject1:fileset dir="${build.classes.dir}" excludes=""/>
+            </jar>
+        </presetdef>
+
+    </target>
+
+    <target name="post-jar">
+        <delete file="MANIFEST.MF"/>
+        <delete dir="temp"/>
+        <delete file="mcc-setup.xml"/>
+        <delete>
+            <fileset dir=".">
+                <include name="library-setup*"/>
+                <include name="core-setup*"/>
+                <include name="standalone-setup*"/>
+            </fileset>
+        </delete>
+
+        <property name="mcc.release.filename" value="${mcc.file.name}_v${mcc.version}.jar"/>
+        <copy file="${dist.jar}" tofile="${mcc.rundir}/libraries/${mcc.release.filename}"/>
+    </target>
+
+    <target name="compile" depends="init">
+        <mkdir dir="${build.classes.dir}"/>
+        <javac fork="true" encoding="UTF-8" debug="true" debuglevel="lines,vars,source" srcdir="${src.dir}" destdir="${build.classes.dir}" classpath="${compile.classpath}">
+            <compilerarg value="-Xlint"/>
+        </javac>
+    </target>
+
+    <target name="compile-debug" depends="init">
+        <mkdir dir="${build.classes.dir}"/>
+        <javac fork="true" encoding="UTF-8" debug="true" debuglevel="lines,vars,source" srcdir="${src.dir}" destdir="${build.classes.dir}" classpath="${compile.classpath}">
+            <compilerarg value="-Xlint"/>
+        </javac>
+    </target>
+
+
+</project>
